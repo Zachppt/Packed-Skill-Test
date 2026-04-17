@@ -4,8 +4,6 @@
 # AethirClaw Intelligence Skills Pack — Installer
 # ─────────────────────────────────────────────────────────
 
-set -e
-
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 OPENCLAW_DIR="$HOME/.openclaw"
 PACKAGE_DIR="$REPO_DIR/package/.openclaw"
@@ -25,12 +23,13 @@ fi
 echo "OpenClaw found: $(openclaw --version 2>/dev/null || echo 'version unknown')"
 echo ""
 
-# ── Backup existing config if present ────────────────────
+# ── Backup existing config (skip system files safely) ────
 if [ -d "$OPENCLAW_DIR" ]; then
   BACKUP="$HOME/.openclaw.backup.$(date +%Y%m%d_%H%M%S)"
   echo "Existing ~/.openclaw found — backing up to $BACKUP"
-  cp -r "$OPENCLAW_DIR" "$BACKUP"
-  echo "Backup created."
+  mkdir -p "$BACKUP"
+  find "$OPENCLAW_DIR" -maxdepth 1 -mindepth 1 ! -name 'init-passwords' ! -name 'password-state' -exec cp -r {} "$BACKUP/" \; 2>/dev/null || true
+  echo "Backup created (system-owned files skipped)."
   echo ""
 fi
 
@@ -47,16 +46,16 @@ echo ""
 echo "Installing Partner Skills via ClawHub..."
 echo ""
 
-npx clawhub@latest install blockbeats-skill
+npx clawhub@latest install blockbeats-skill || echo "blockbeats-skill install failed — retry manually"
 echo ""
 
-npx clawhub@latest install rdquanyu/rootdata-crypto
+npx clawhub@latest install rdquanyu/rootdata-crypto || echo "rootdata-crypto install failed — retry manually"
 echo ""
 
-npx clawhub@latest install binance/binance-skills-hub
+npx clawhub@latest install binance/binance-skills-hub || echo "binance-skills-hub install failed — retry manually"
 echo ""
 
-echo "Partner Skills installed."
+echo "Partner Skills step complete."
 echo ""
 
 # ── Set up secrets.env if not present ────────────────────
@@ -78,7 +77,7 @@ BINANCE_SQUARE_API_KEY=
 EOF
   echo "secrets.env created at ~/.openclaw/secrets.env"
   echo ""
-  echo "ACTION REQUIRED: Open the file and add your API keys:"
+  echo "ACTION REQUIRED: Add your API keys:"
   echo "  nano ~/.openclaw/secrets.env"
   echo ""
 else
@@ -88,21 +87,12 @@ fi
 
 # ── Set up crontab ────────────────────────────────────────
 echo "Setting up cron jobs..."
-echo ""
 
-# Read existing crontab, remove any previous AethirClaw entries, add new ones
 (crontab -l 2>/dev/null | grep -v "AethirClaw\|daily-briefing\|kol-growth-pack\|due-diligence"; cat << 'CRON'
 # ── AethirClaw Intelligence Agent ─────────────────────────
-# Daily Intelligence Briefing — 06:30 UTC
 30 6 * * * openclaw agent --workspace daily-briefing --message "run briefing task" --deliver
-
-# KOL Trend Radar — every 4 hours
 0 6,10,14,18,22 * * * openclaw agent --workspace kol-growth-pack --message "run trend-radar task" --deliver
-
-# KOL Content Factory — 08:00 UTC
 0 8 * * * openclaw agent --workspace kol-growth-pack --message "run content-factory task" --deliver
-
-# KOL Publishing Engine — 09:30 UTC
 30 9 * * * openclaw agent --workspace kol-growth-pack --message "run publishing-engine task" --deliver
 CRON
 ) | crontab -
@@ -114,15 +104,12 @@ echo ""
 echo "───────────────────────────────────"
 echo "Verifying installation..."
 echo ""
-
 echo "Files in ~/.openclaw/:"
 ls "$OPENCLAW_DIR"
 echo ""
-
 echo "Workspaces:"
-ls "$OPENCLAW_DIR/workspaces/"
+ls "$OPENCLAW_DIR/workspaces/" 2>/dev/null || echo "workspaces directory not found"
 echo ""
-
 echo "───────────────────────────────────"
 echo "Installation complete."
 echo ""
@@ -131,14 +118,10 @@ echo ""
 echo "1. Add your API keys:"
 echo "   nano ~/.openclaw/secrets.env"
 echo ""
-echo "2. Make sure the OpenClaw gateway is running:"
+echo "2. Check gateway status:"
 echo "   openclaw gateway status"
 echo ""
-echo "3. Set your KOL persona (first time only):"
-echo "   Tell the Agent: 'Update my KOL persona: Voice: [your style] ...'"
-echo ""
-echo "4. Test the daily briefing manually:"
+echo "3. Test daily briefing:"
 echo "   openclaw agent --workspace daily-briefing --message 'run briefing task' --deliver"
 echo ""
-echo "Docs: see README.md for full usage guide."
 echo "───────────────────────────────────"
